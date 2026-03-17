@@ -45,10 +45,23 @@ sage --version
 ```
 
 ---
+## 2. Install Macaulay2
 
+Instructions:
 
+https://macaulay2.com/
 
-## 2. Install the PGCNN package
+Verify installation:
+
+M2
+
+Inside Macaulay2 install the Cremona package:
+
+installPackage "Cremona"
+
+---
+
+## 3. Install the PGCNN package
 
 
 ```bash
