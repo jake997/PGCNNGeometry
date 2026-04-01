@@ -13,6 +13,17 @@ def test1_pgcnn_fiber_size(cyclic2):
     assert isinstance(size, int)
     assert size == 4
 
+def test1_pgcnn_fiber_size_finite(cyclic2):
+    net = PGCNN(cyclic2, [2, 2, 1], finite_ring=True)
+    size = net.compute_size_fiber_Phi_m2()
+    assert isinstance(size, int)
+    assert size == 4
+
+    size = net.compute_size_fiber_varphi_m2()
+    assert isinstance(size, int)
+    assert size == 4
+
+
 @pytest.mark.slow
 def test2_pgcnn_fiber_size(cyclic3, dihedral4):
     net = PGCNN(cyclic3, [2, 2, 1])

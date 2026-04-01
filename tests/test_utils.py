@@ -6,7 +6,7 @@ from pgcnn.utils import (
     group_action_right,
     tensor_power
 )
-from tests.conftest import cyclic2
+#from tests.conftest import cyclic2
 
 
 def test_group_matrix_shape(cyclic3):

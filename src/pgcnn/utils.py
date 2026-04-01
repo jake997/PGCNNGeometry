@@ -184,7 +184,7 @@ def tensor_power(M, k):
 
 
 
-def compute_varphi(G, r):
+def compute_varphi(G, r, base_ring=QQ):
     """Compute the full network transformation as symbolic coefficients.
     
     Constructs a multi-layer group-convolutional network by composing layer-wise
@@ -197,6 +197,8 @@ def compute_varphi(G, r):
         The symmetry group (e.g., cyclic, dihedral, symmetric).
     r : list of int
         Activation parameters: repetition counts per layer. len(r) = number of layers.
+    base_ring : Ring, optional
+        The ring over which to define the polynomial ring for coefficients. Default is QQ.
     
     Returns
     -------
@@ -240,7 +242,8 @@ def compute_varphi(G, r):
     for i in range(1, len(matrices)):
         varphi_matrix = varphi_matrix * matrices[i]
     
-    coefficients = list(varphi_matrix[0]) # the first row of the matrix varphi include the whole filter
+    RY = PolynomialRing(base_ring, all_params)
+    coefficients = [RY(c) for c in varphi_matrix[0]] # the first row of the matrix varphi include the whole filter
     return coefficients
 
 
@@ -276,7 +279,7 @@ def elementwise_power(V, k):
     """
     return vector([V[i]**k for i in range(len(V))])
 
-def compute_Phi(G, r):
+def compute_Phi(G, r, base_ring=QQ):
     """Compute the network output polynomial as coefficients in weight variables.
     
     Builds a multi-layer group-convolutional network by repeatedly applying
@@ -288,7 +291,9 @@ def compute_Phi(G, r):
         The symmetry group defining the convolution structure.
     r : list of int
         Activation function exponents per layer. len(r) = number of layers.
-    
+    base_ring : Ring, optional
+        The ring over which to define the polynomial ring. Default is QQ.
+ 
     Returns
     -------
     coefficients : list
@@ -320,7 +325,7 @@ def compute_Phi(G, r):
     phi_expr = signal[0]
     
     # Convert to polynomial ring: RX[x_vars] with coefficients in RY[all_params]
-    RY = PolynomialRing(QQ, all_params)
+    RY = PolynomialRing(base_ring, all_params)
     RX = PolynomialRing(RY, x_vars)
     phi_poly = RX(phi_expr)
     

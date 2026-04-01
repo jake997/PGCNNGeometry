@@ -1,9 +1,11 @@
+# This is an example Sage script to test the PGCNN class and its methods.
 from pgcnn import PGCNN
 
 def test_PGCNN():
     G = CyclicPermutationGroup(3) #SymmetricGroup(3)  
     r = [2,  1]
-    pgcnn = PGCNN(G, r)
+    #pgcnn = PGCNN(G, r, finite_ring=True) # over a finite ring GF(1009)
+    pgcnn = PGCNN(G, r) # over the rationals QQ
     print("Testing PGCNN with group:", G, "and activations:", r)    
     # Compute dimensions of images and sizes of generic fibers.
     

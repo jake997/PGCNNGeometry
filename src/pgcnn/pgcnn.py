@@ -11,7 +11,7 @@ Main class: PGCNN
 
 from sage.all import (
     var, SR, symbolic_expression, prod, vector,
-    jacobian, QQ, PolynomialRing
+    jacobian, QQ, GF, PolynomialRing
 )
 
 #from sage.rings.polynomial import PolynomialRing
@@ -32,7 +32,7 @@ from .utils import (
 class PGCNN:
     """Projective G-CNN helper class with Macaulay2 image/fiber analysis."""
 
-    def __init__(self, G, r):
+    def __init__(self, G, r, finite_ring=False):
         """
         Initialize a Projective G-CNN network.
         
@@ -55,8 +55,12 @@ class PGCNN:
             Coefficients of the network transformation map varphi.
         Phi_coeffs : list
             Coefficients of the network output polynomial Phi.
+        ring_sage : Ring
+            The ring used for Sage computations (QQ or finite field).
+        ring_m2 : str
+            The corresponding ring specification for Macaulay2.
         """
-        self.G = G
+        self.group = G
         self.r = r
         self.n = len(G.list())
         self.L = len(r)
@@ -68,8 +72,17 @@ class PGCNN:
         self.params = [self.y_vars[i*self.n:(i+1)*self.n] for i in range(self.L)]
         self.all_params = [p for layer in self.params for p in layer]
 
+        if finite_ring:
+            self.ring_sage = GF(1009)
+            self.ring_m2 = "ZZ/1009"
+        else: 
+            self.ring_sage = QQ
+            self.ring_m2 = "QQ"
+
+
         self.varphi_coeffs = None # compute varphi coefficients takes very long time, therefore it is done when needed.
-        self.Phi_coeffs = compute_Phi(self.G, self.r)
+        self.Phi_coeffs = compute_Phi(self.group, self.r, base_ring=self.ring_sage)
+
 
 
 
@@ -86,15 +99,15 @@ class PGCNN:
         filters : list of list
             List of filters (weight vectors) for each layer.
         """
-        R = QQ
+        R = self.ring_sage
         filters = [[R.random_element() for _ in self.params[i]] for i in range(self.L)]
         point = [item for filter in filters for item in filter]
-        det = prod([group_matrix(list(self.G), vector(R, filter)).det() for filter in filters])
+        det = prod([group_matrix(list(self.group), vector(R, filter)).det() for filter in filters])
 
         while(det == 0):
             filters = [[R.random_element() for _ in self.params[i]] for i in range(self.L)]
             point = [item for filter in filters for item in filter]
-            det = prod([group_matrix(list(self.G), vector(R, filter)).det() for filter in filters])
+            det = prod([group_matrix(list(self.group), vector(R, filter)).det() for filter in filters])
 
         return point, filters
     
@@ -102,9 +115,9 @@ class PGCNN:
 
     def _expected_generic_fiber(self, filters):
 
-        R = QQ
-        group_prod =[g for g in list(product(list(self.G), repeat=self.L + 1)) if g[0] == self.G.one() and g[-1] == self.G.one()]
-        fiber = [[group_action_right(list(self.G), group_action_left(list(self.G), vector(R, filters[i]), g[i].inverse()), g[i+1]) 
+        R = self.ring_sage
+        group_prod =[g for g in list(product(list(self.group), repeat=self.L + 1)) if g[0] == self.group.one() and g[-1] == self.group.one()]
+        fiber = [[group_action_right(list(self.group), group_action_left(list(self.group), vector(R, filters[i]), g[i].inverse()), g[i+1]) 
                   for i in range(self.L) ] 
                  for g in group_prod]
         return fiber
@@ -141,7 +154,8 @@ class PGCNN:
         degrees_str = '{' + ', '.join(degree_vectors) + '}'
         
         # Create multigraded ring with layer-based grading
-        m2_cmd = f"R = newRing(QQ[{param_names}], Degrees => {degrees_str})"
+        #m2_cmd = f"R = newRing(QQ[{param_names}], Degrees => {degrees_str})"
+        m2_cmd = f"R = newRing({self.ring_m2}[{param_names}], Degrees => {degrees_str})"
         m2.eval(m2_cmd)
 
         # Create the irrelevant ideal
@@ -194,11 +208,9 @@ class PGCNN:
             coeff_strings.append(coeff_str)
 
         coeff_list = ", ".join(coeff_strings)
-        #print(f"Creating matrix with coefficients: {coeff_list}")
 
         # build a one‑row matrix; note the double braces required by M2
         m2_cmd = "F = matrix{{" + coeff_list + "}}"
-        #print(f"M2 command: {m2_cmd}")
         result = m2.eval(m2_cmd)
         if "error" in result.lower():
             raise RuntimeError(f"Failed to create matrix F: {result}")
@@ -238,10 +250,12 @@ class PGCNN:
         # Convert coefficients from polynomial ring to symbolic ring to enable substitution
         evaluated = []
         for c in coeffs:
-            # Convert to symbolic ring if needed
-            c_sym = SR(c)
-            evaluated.append(c_sym.subs(sub))
-        
+            R = c.parent()  # polynomial ring over ring_sage
+
+            # build evaluation hom: R → ring_sage by sending each parameter to its value in the point
+            phi = R.hom(point, self.ring_sage)
+
+            evaluated.append(phi(c))
         coords = ", ".join(str(v) for v in evaluated)
         return coords, evaluated
 
@@ -292,7 +306,6 @@ class PGCNN:
             if relations:
                 fiber_rel_str = ", ".join(relations)
                 result = m2.eval(f"fiberRel = ideal({fiber_rel_str})")
-                #print("fiberRel gens :", m2.eval("gens fiberRel"))
                 if "error" in result.lower():
                     raise RuntimeError(f"Failed to create fiberRel ideal: {result}")
                 result = m2.eval("ideals = append(ideals, fiberRel)")  # Append the ideal to the list
@@ -367,6 +380,10 @@ class PGCNN:
             result = m2.eval("fiberIdeal = ideal(0)")
             if "error" in result.lower():
                 raise RuntimeError(f"Failed to create fiberIdeal ideal: {result}")
+        
+        result = m2.eval("fiberIdealNotSaturated = fiberIdeal")
+        if "error" in result.lower():
+            raise RuntimeError(f"Failed to create fiberIdeal ideal: {result}")
 
         result = m2.eval("fiberIdeal = saturate(fiberIdeal, baseLocus)")
         if "error" in result.lower():
@@ -394,11 +411,10 @@ class PGCNN:
         int
             degree of fiberIdeal
         """
-
-        result = m2.eval("degree fiberIdeal")
-        if "error" in result.lower():
-                raise RuntimeError(f"Failed to compute degree of fiberIdeal: {result}")
-        return int(result)
+        degree = m2.eval("degree fiberIdeal")
+        if "error" in degree.lower():
+                raise RuntimeError(f"Failed to compute degree of fiberIdeal: {degree}")
+        return int(degree)
 
     
 
@@ -414,7 +430,7 @@ class PGCNN:
             Dimension of the image of the rational map varphi.
         """
         if self.varphi_coeffs is None:
-            self.varphi_coeffs = compute_varphi(self.G, self.r)
+            self.varphi_coeffs = compute_varphi(self.group, self.r, base_ring=self.ring_sage)
         m2 = self._init_ring_m2()
         m2 = self._make_map_m2(m2, self.varphi_coeffs)
         result = m2.eval("dim image phi")
@@ -452,7 +468,7 @@ class PGCNN:
             The generic fiber size of varphi, or -1 if the fiber is not 0-dimensional.
         """
         if self.varphi_coeffs is None:
-            self.varphi_coeffs = compute_varphi(self.G, self.r)
+            self.varphi_coeffs = compute_varphi(self.group, self.r, base_ring=self.ring_sage)
         point, _ = self._generic_point()
         m2 = self._fiber_ideal_m2(self.varphi_coeffs, point=point)
         degree = self._fiber_size_degree_m2(m2)
@@ -521,7 +537,7 @@ class PGCNN:
             True if fiberIdeal equals expectedFiberIdeal, False otherwise.
         """
         if self.varphi_coeffs is None:
-            self.varphi_coeffs = compute_varphi(self.G, self.r)
+            self.varphi_coeffs = compute_varphi(self.group, self.r, base_ring=self.ring_sage)
         
         point, filters = self._generic_point()
         m2 = self._fiber_ideal_m2(self.varphi_coeffs, point=point)
@@ -552,12 +568,12 @@ class PGCNN:
         rank : int
             Rank of the Jacobian matrix at a generic point.
         """
-        f = symbolic_expression(coeffs).function(*(self.all_params))
-        J = jacobian(f, self.all_params)
+        gens = coeffs[0].parent().gens()  # get the generators of the polynomial ring
+        J = jacobian(coeffs, gens)
         point, _ = self._generic_point()
         J = J(*point)
         rank = J.rank()
-        return rank
+        return int(rank)
 
         
   
@@ -575,7 +591,7 @@ class PGCNN:
             Dimension of the image (rank of Jacobian at a generic point).
         """
         if self.varphi_coeffs is None:
-            self.varphi_coeffs = compute_varphi(self.G, self.r)
+            self.varphi_coeffs = compute_varphi(self.group, self.r, base_ring=self.ring_sage)
         dim_image = self._compute_dim_image_sage(self.varphi_coeffs)
         return dim_image
     
