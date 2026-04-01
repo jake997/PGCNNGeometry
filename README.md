@@ -124,16 +124,17 @@ See example.sage for more examples.
 
 If you use this package in research, please cite our paper. 
 
+```bibtex
 @misc{hendi2026geometrypolynomialgroupconvolutional,
-      title={The Geometry of Polynomial Group Convolutional Neural Networks}, 
-      author={Yacoub Hendi and Daniel Persson and Magdalena Larfors},
-      year={2026},
-      eprint={2603.29566},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2603.29566}, 
+  title        = {The Geometry of Polynomial Group Convolutional Neural Networks},
+  author       = {Yacoub Hendi and Daniel Persson and Magdalena Larfors},
+  year         = {2026},
+  eprint       = {2603.29566},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.LG},
+  url          = {https://arxiv.org/abs/2603.29566},
 }
-
+```
 ---
 
 # License
